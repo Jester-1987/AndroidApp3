@@ -1,4 +1,4 @@
-package com.triosng2024.treasurehunt
+package com.triosng2024.treasurehunt.ui
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -7,11 +7,9 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.util.Log
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-
+import com.google.android.gms.common.api.ApiException
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -19,12 +17,25 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.PointOfInterest
+
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.net.FetchPhotoRequest
+import com.google.android.libraries.places.api.net.FetchPlaceRequest
+import com.google.android.libraries.places.api.net.PlacesClient
+import com.triosng2024.treasurehunt.R
+import com.triosng2024.treasurehunt.adapter.BookmarkInfoWindowAdapter
 import com.triosng2024.treasurehunt.databinding.ActivityMapsBinding
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
+
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private lateinit var placesClient: PlacesClient
+
     private lateinit var binding: ActivityMapsBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +49,85 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
         setupLocationClient()
+        setupPlacesClient()
+    }
+
+    private fun displayPoi(pointOfInterest: PointOfInterest) {
+        displayPoiGetPlaceStep(pointOfInterest)
+    }
+
+    private fun displayPoiGetPlaceStep(pointOfInterest: PointOfInterest) {
+        val placeId = pointOfInterest.placeId
+
+        val placeFields = listOf(Place.Field.ID,
+            Place.Field.NAME,
+            Place.Field.PHONE_NUMBER,
+            Place.Field.PHOTO_METADATAS,
+            Place.Field.ADDRESS,
+            Place.Field.LAT_LNG)
+
+        val request = FetchPlaceRequest
+            .builder(placeId, placeFields)
+            .build()
+
+        placesClient.fetchPlace(request)
+            .addOnSuccessListener { response ->
+                val place = response.place
+                displayPoiGetPhotoStep(place)
+            }.addOnFailureListener {
+                exception ->
+                if (exception is ApiException) {
+                    val statusCode = exception.statusCode
+                    Log.e(
+                        TAG,
+                        "Place not found: " +
+                                exception.message + ", " +
+                                "statusCode: " + statusCode)
+                }
+            }
+    }
+
+    private fun displayPoiGetPhotoStep(place: Place) {
+
+        val photoMetadata = place
+            .getPhotoMetadatas()?.get(0)
+
+        if (photoMetadata == null) {
+            displayPoiDisplayStep(place, null)
+            return
+        }
+        val photoRequest = FetchPhotoRequest
+            .builder(photoMetadata)
+            .setMaxWidth(resources.getDimensionPixelSize(
+                R.dimen.default_image_width
+            ))
+            .setMaxHeight(resources.getDimensionPixelSize(
+                R.dimen.default_image_height
+            ))
+            .build()
+        placesClient.fetchPhoto(photoRequest)
+            .addOnSuccessListener { fetchPhotoResponse ->
+                val bitmap = fetchPhotoResponse.bitmap
+                displayPoiDisplayStep(place, bitmap)
+            }.addOnFailureListener { exception ->
+                if (exception is ApiException) {
+                    val statusCode = exception.statusCode
+                    Log.e(
+                        TAG,
+                        "Place not found: " +
+                                exception.message + ", " +
+                                "statusCode: " + statusCode)
+                }
+            }
+    }
+
+    private fun displayPoiDisplayStep(place:Place, photo: Bitmap?){
+        val marker = mMap.addMarker(MarkerOptions()
+            .position(place.latLng as LatLng)
+            .title(place.name)
+            .snippet(place.phoneNumber)
+        )
+        marker?.tag = photo
     }
 
     /**
@@ -51,6 +141,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
      */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
+        mMap.setInfoWindowAdapter(BookmarkInfoWindowAdapter(this))
 
         // Add a marker to a local business and move the camera
         val teaHouse = LatLng(43.725808,-79.722134) // not sure how many points are needed so I used what the getlatlong site had.
@@ -58,6 +149,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap.moveCamera(CameraUpdateFactory.newLatLng(teaHouse))
 
         getCurrentLocation()
+        mMap.setOnPoiClickListener {
+            displayPoi(it)
+        }
+    }
+
+    private fun setupPlacesClient() {
+        Places.initialize(applicationContext,
+            getString(R.string.google_maps_key)) //TODO REMOVE FROM strings.xml BEFORE UPLOADING TO GITHUB!!!
+        placesClient = Places.createClient(this)
     }
 
     private fun setupLocationClient() {
@@ -69,7 +169,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         ActivityCompat.requestPermissions(this,
             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION),
-            REQUEST_LOCATION)
+            REQUEST_LOCATION
+        )
     }
 
     companion object {
