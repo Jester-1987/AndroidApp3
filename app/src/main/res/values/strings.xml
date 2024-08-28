@@ -4,5 +4,7 @@
     <string name="google_maps_key"
         templateMergeStrategy="preserve"
         translatable="false">
-        AIzaSyAx1tC0GKnfFaCWdSnwVnmxHd4w1xUY-W8</string>
+<!--        YOUR_API_KEY-->
+        </string>
+<!--    TODO - REMOVE API KEY BEFORE UPLOAD TO GITHUB!!!!!!!-->
 </resources>
