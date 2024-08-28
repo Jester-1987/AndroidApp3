@@ -156,7 +156,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun setupPlacesClient() {
         Places.initialize(applicationContext,
-            getString(R.string.google_maps_key)) //TODO REMOVE FROM strings.xml BEFORE UPLOADING TO GITHUB!!!
+            getString(R.string.google_maps_key))
         placesClient = Places.createClient(this)
     }
 

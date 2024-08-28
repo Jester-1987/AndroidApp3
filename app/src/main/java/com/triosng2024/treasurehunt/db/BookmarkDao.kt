@@ -1,6 +1,5 @@
 package com.triosng2024.treasurehunt.db
 
-import android.adservices.adid.AdId
 import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
